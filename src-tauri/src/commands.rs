@@ -4,11 +4,11 @@ use reqwest::Client;
 use serde_json::Value;
 use std::fs::{self, File};
 use std::io::Write;
-use std::path::{Path};
+use std::path::Path;
 use std::process::Command;
 use std::string::ToString;
 use tauri::path::BaseDirectory;
-use tauri::{Manager};
+use tauri::Manager;
 
 #[tauri::command]
 pub fn open_file_in_folder(path: &str) {
