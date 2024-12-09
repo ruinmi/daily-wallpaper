@@ -49,12 +49,12 @@ const btnType = computed(() => {
     >
     <template #arrow>
       <div class="custom-arrow">
-        <n-button strong secondary @click="handlePrev">
+        <n-button class="custom-arrow-btn" strong secondary @click="handlePrev">
           <n-icon>
             <ArrowLeft12Filled/>
           </n-icon>
         </n-button>
-        <n-button strong secondary @click="handleNext">
+        <n-button class="custom-arrow-btn" strong secondary @click="handleNext">
           <n-icon>
             <ArrowRight12Filled/>
           </n-icon>
@@ -91,6 +91,16 @@ const btnType = computed(() => {
   padding: 0;
   transition: background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
+}
+
+.custom-arrow-btn:focus,
+.custom-arrow-btn:active,
+.custom-arrow-btn {
+  background-color: #0505055d;
+}
+
+.custom-arrow-btn:hover {
+  background-color: #31313175;
 }
 
 .custom-arrow button:disabled {
