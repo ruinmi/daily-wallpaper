@@ -1,6 +1,7 @@
 use crate::wallpaper::Wallpaper;
 use reqwest;
 use reqwest::Client;
+use reqwest::Proxy;
 use serde_json::Value;
 use std::fs::{self, File};
 use std::io::Write;
@@ -59,7 +60,10 @@ pub async fn fetch_wallpaper(
     orientation: String,
     color: String,
 ) -> Result<Vec<Wallpaper>, String> {
-    let client = Client::new();
+    let client = Client::builder()
+        .proxy(Proxy::http("http://127.0.0.1:7890").map_err(|e| format!("代理设置错误: {}", e))?)
+        .build()
+        .map_err(|e| format!("创建客户端失败: {}", e))?;
     let url = format!(
         "{URL_PREFIX}?page={}&per_page={}&query={}&orientation={}&size=all&color={}&seo_tags=true",
         page, per_page, keyword, orientation, color
