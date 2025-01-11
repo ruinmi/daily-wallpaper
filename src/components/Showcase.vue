@@ -4,16 +4,43 @@ import {useMainStore} from "../stores/useMainStore.ts";
 import {setWallpaper} from "../modules/api";
 
 const mainStore = useMainStore()
+const currentSrc = ref("")
+const thumbnail = ref(""); // 缩略图的 Base64 数据
+const original = ref(""); // 原始图片路径
 
-const handlePrev = () => {
+const handlePrev = async () => {
   if (mainStore.wpIdx - mainStore.firstWpIdx > 0) {
     mainStore.wpIdx -= 1
+    await loadImage()
+  }
+}
+const loadImage = async () => {
+  // 生成缩略图
+  try {
+    thumbnail.value = await generateThumbnail(currentWallpaper.value?.img_src);
+    currentSrc.value = thumbnail.value; // 先显示缩略图
+  } catch (error) {
+    console.error("缩略图生成失败:", error);
+  }
+
+  // 设置原始图片路径
+  original.value = currentWallpaper.value ? currentWallpaper.value.img_src : ""
+
+  // 预加载原始图片
+  const img = new Image();
+  img.src = original.value;
+  img.onload = () => {
+    currentSrc.value = original.value; // 替换为原始图片
+  };
+  img.onerror = () => {
+    console.error("原始图片加载失败");
   }
 }
 
-const handleNext = () => {
+const handleNext = async () => {
   if (mainStore.wpIdx - mainStore.firstWpIdx < mainStore.wallpapers.length - 1) {
     mainStore.wpIdx += 1
+    await loadImage()
   }
 }
 
@@ -21,14 +48,57 @@ const handleSetWallpaper = async () => {
   await setWallpaper(mainStore.wpIdx)
 }
 
+const currentWallpaper = computed(() => {
+  return mainStore.wallpapers.find(v => v.idx == mainStore.wpIdx)
+})
+
 const btnType = computed(() => {
-  if (mainStore.wallpapers.find(v => v.idx == mainStore.wpIdx)?.used) {
+  if (currentWallpaper.value?.used) {
     return "default"
   } else {
     return "success"
   }
 })
 
+const generateThumbnail = (imagePath: string | undefined, maxWidth = 72, maxHeight = 40.5): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    if (!imagePath) {
+      reject()
+    } else {
+      const img = new Image()
+      img.src = imagePath
+      img.crossOrigin = "anonymous"
+
+      img.onload = () => {
+        const originalWidth = img.naturalWidth;
+        const originalHeight = img.naturalHeight;
+        let width = maxWidth;
+        let height = maxHeight;
+        if (originalWidth > originalHeight) {
+          height = (maxWidth / originalWidth) * originalHeight;
+        } else {
+          width = (maxHeight / originalHeight) * originalWidth;
+        }
+        const canvas = document.createElement("canvas")
+        canvas.width = Math.round(width);
+        canvas.height = Math.round(height);
+
+        const ctx = canvas.getContext("2d")
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height)
+
+          // 将缩略图转为 base64
+          const thumbnail = canvas.toDataURL("image/jpeg", 0.8) // 0.8 为压缩质量
+          resolve(thumbnail);
+        }
+      }
+
+      img.onerror = () => {
+        reject(new Error("图片加载失败"))
+      }
+    }
+  })
+}
 </script>
 
 <template>
@@ -45,7 +115,7 @@ const btnType = computed(() => {
     <img class="carousel-img"
          v-for="wp in mainStore.wallpapers"
          :alt="wp.name"
-         :src="wp.img_src"
+         :src="currentSrc"
     >
     <template #arrow>
       <div class="custom-arrow">
