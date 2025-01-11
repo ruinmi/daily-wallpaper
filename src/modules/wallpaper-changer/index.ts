@@ -28,7 +28,7 @@ const shouldChangeWallpaper = (): boolean => {
 const changeWallpaper = async () => {
     const mainStore = useMainStore()
 
-    if (mainStore.config.activeWpIdx >= mainStore.wallpapers.length - 1) {
+    if (mainStore.config.activeWpIdx - mainStore.firstWpIdx >= mainStore.wallpapers.length - 1) {
         await fetchWallpaper()
     }
 

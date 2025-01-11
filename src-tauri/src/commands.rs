@@ -42,9 +42,7 @@ pub fn open_folder(path: &str) {
 #[tauri::command]
 pub fn set_wallpaper_command(path: &str) -> Result<String, String> {
     match wallpaper::set_from_path(path) {
-        Ok(_) => {
-            Ok("Wallpaper set successfully.".to_string())
-        },
+        Ok(_) => Ok("Wallpaper set successfully.".to_string()),
         Err(err) => Err(err.to_string()),
     }
 }
@@ -61,7 +59,10 @@ pub async fn fetch_wallpaper(
     color: String,
 ) -> Result<Vec<Wallpaper>, String> {
     let client = Client::builder()
-        .proxy(Proxy::http("http://127.0.0.1:7890").map_err(|e| format!("代理设置错误: {}", e))?)
+        .proxy(
+            Proxy::http("http://127.0.0.1:7890")
+                .map_err(|e: reqwest::Error| format!("代理设置错误: {}", e))?,
+        )
         .build()
         .map_err(|e| format!("创建客户端失败: {}", e))?;
     let url = format!(
@@ -86,12 +87,12 @@ pub async fn fetch_wallpaper(
     let mut wallpapers: Vec<Wallpaper> = serde_json::from_str(&data_json)
         .map_err(|e| format!("Failed to deserialize wallpapers: {} -- {}", e, data_json))?;
 
-    let app_data_dir = app
-        .path()
-        .app_data_dir()
-        .unwrap();
+    let app_data_dir = app.path().app_data_dir().unwrap();
 
-    let wallpaper_dir = app_data_dir.join("wallpapers").join(&keyword).join(saved_page.to_string());
+    let wallpaper_dir = app_data_dir
+        .join("wallpapers")
+        .join(&keyword)
+        .join(saved_page.to_string());
     if !wallpaper_dir.exists() {
         fs::create_dir_all(&wallpaper_dir)
             .map_err(|e| format!("Failed to create wallpaper directory: {}", e))?;
@@ -152,8 +153,13 @@ async fn download_and_save_image(
         .await
         .map_err(|e| format!("Failed to read image content: {}", e))?;
 
-    let mut file = File::create(output_path)
-        .map_err(|e| format!("Failed to create file: {} -- {}", e, output_path.to_string_lossy()))?;
+    let mut file = File::create(output_path).map_err(|e| {
+        format!(
+            "Failed to create file: {} -- {}",
+            e,
+            output_path.to_string_lossy()
+        )
+    })?;
     file.write_all(&content)
         .map_err(|e| format!("Failed to write image content: {}", e))?;
 
