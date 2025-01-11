@@ -11,9 +11,39 @@ const original = ref(""); // 原始图片路径
 const handlePrev = async () => {
   if (mainStore.wpIdx - mainStore.firstWpIdx > 0) {
     mainStore.wpIdx -= 1
-    await loadImage()
   }
 }
+
+const handleNext = async () => {
+  if (mainStore.wpIdx - mainStore.firstWpIdx < mainStore.wallpapers.length - 1) {
+    mainStore.wpIdx += 1
+  }
+}
+
+const handleSetWallpaper = async () => {
+  await setWallpaper(mainStore.wpIdx)
+}
+
+onMounted(() => {
+  loadImage()
+})
+
+const currentWallpaper = computed(() => {
+  return mainStore.wallpapers.find(v => v.idx == mainStore.wpIdx)
+})
+
+watch(currentWallpaper, () => {
+  loadImage()
+})
+
+const btnType = computed(() => {
+  if (currentWallpaper.value?.used) {
+    return "default"
+  } else {
+    return "success"
+  }
+})
+
 const loadImage = async () => {
   // 生成缩略图
   try {
@@ -36,29 +66,6 @@ const loadImage = async () => {
     console.error("原始图片加载失败");
   }
 }
-
-const handleNext = async () => {
-  if (mainStore.wpIdx - mainStore.firstWpIdx < mainStore.wallpapers.length - 1) {
-    mainStore.wpIdx += 1
-    await loadImage()
-  }
-}
-
-const handleSetWallpaper = async () => {
-  await setWallpaper(mainStore.wpIdx)
-}
-
-const currentWallpaper = computed(() => {
-  return mainStore.wallpapers.find(v => v.idx == mainStore.wpIdx)
-})
-
-const btnType = computed(() => {
-  if (currentWallpaper.value?.used) {
-    return "default"
-  } else {
-    return "success"
-  }
-})
 
 const generateThumbnail = (imagePath: string | undefined, maxWidth = 72, maxHeight = 40.5): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -105,7 +112,6 @@ const generateThumbnail = (imagePath: string | undefined, maxWidth = 72, maxHeig
   <n-carousel
       dot-type="line"
       effect="custom"
-      :transition-props="{ name: 'creative' }"
       show-arrow
       :show-dots="false"
       :loop="false"
@@ -116,6 +122,7 @@ const generateThumbnail = (imagePath: string | undefined, maxWidth = 72, maxHeig
          v-for="wp in mainStore.wallpapers"
          :alt="wp.name"
          :src="currentSrc"
+         v-show="currentSrc"
     >
     <template #arrow>
       <div class="custom-arrow">
@@ -143,7 +150,7 @@ const generateThumbnail = (imagePath: string | undefined, maxWidth = 72, maxHeig
 <style scoped>
 .carousel-img {
   width: 100%;
-  min-height: 405px;
+  height: 405px;
   object-fit: cover;
 }
 
@@ -175,16 +182,5 @@ const generateThumbnail = (imagePath: string | undefined, maxWidth = 72, maxHeig
 
 .custom-arrow button:disabled {
   cursor: default;
-}
-
-:deep(.creative-enter-from),
-:deep(.creative-leave-to) {
-  opacity: 0;
-  transform: scale(0.8);
-}
-
-:deep(.creative-enter-active),
-:deep(.creative-leave-active) {
-  transition: all 0.3s ease;
 }
 </style>
