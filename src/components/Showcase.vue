@@ -5,8 +5,6 @@ import {setWallpaper} from "../modules/api";
 
 const mainStore = useMainStore()
 const currentSrc = ref("")
-const thumbnail = ref(""); // 缩略图的 Base64 数据
-const original = ref(""); // 原始图片路径
 
 const handlePrev = async () => {
   if (mainStore.wpIdx - mainStore.firstWpIdx > 0) {
@@ -25,7 +23,7 @@ const handleSetWallpaper = async () => {
 }
 
 onMounted(() => {
-  loadImage()
+  loadImageWithCache()
 })
 
 const currentWallpaper = computed(() => {
@@ -33,7 +31,7 @@ const currentWallpaper = computed(() => {
 })
 
 watch(currentWallpaper, () => {
-  loadImage()
+  loadImageWithCache()
 })
 
 const btnType = computed(() => {
@@ -44,26 +42,29 @@ const btnType = computed(() => {
   }
 })
 
-const loadImage = async () => {
-  // 生成缩略图
+const imageCache = new Map(); // 缓存图片的 Map
+
+const loadImageWithCache = async () => {
+  const imagePath = currentWallpaper.value ? currentWallpaper.value.img_src : "";
+  if (imageCache.has(imagePath)) {
+    currentSrc.value = imageCache.get(imagePath).src
+    return
+  }
   try {
-    thumbnail.value = await generateThumbnail(currentWallpaper.value?.img_src);
-    currentSrc.value = thumbnail.value; // 先显示缩略图
+    currentSrc.value = await generateThumbnail(imagePath)
   } catch (error) {
     console.error("缩略图生成失败:", error);
   }
+  const img = new Image()
+  img.src = imagePath
 
-  // 设置原始图片路径
-  original.value = currentWallpaper.value ? currentWallpaper.value.img_src : ""
-
-  // 预加载原始图片
-  const img = new Image();
-  img.src = original.value;
   img.onload = () => {
-    currentSrc.value = original.value; // 替换为原始图片
-  };
+    imageCache.set(imagePath, img) // 将图片加入缓存
+    currentSrc.value = imagePath
+  }
+
   img.onerror = () => {
-    console.error("原始图片加载失败");
+    console.log("完整图片加载失败")
   }
 }
 
