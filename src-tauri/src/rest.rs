@@ -1,13 +1,18 @@
 use device_query::{DeviceQuery, DeviceState};
 use rodio::{Decoder, OutputStream, Sink};
-use std::{fs::File, io::BufReader, mem, ptr, thread, time::{Duration, Instant}};
+use std::{
+    fs::File,
+    io::BufReader,
+    mem, ptr, thread,
+    time::{Duration, Instant},
+};
 use tauri::Emitter;
 use tauri::Manager;
 
-// const WORK_DURATION: Duration = Duration::new(30 * 60, 0);
-const WORK_DURATION: Duration = Duration::new(3, 0);
-// const REST_DURATION: Duration = Duration::new(5 * 60, 0);
-const REST_DURATION: Duration = Duration::new(10, 0);
+const WORK_DURATION: Duration = Duration::new(30 * 60, 0);
+// const WORK_DURATION: Duration = Duration::new(3, 0);
+const REST_DURATION: Duration = Duration::new(5 * 60, 0);
+// const REST_DURATION: Duration = Duration::new(10, 0);
 static MP3_PATH: Mutex<String> = Mutex::new(String::new());
 
 #[tauri::command]
@@ -123,7 +128,7 @@ fn wait_for_mouse_stop(app: &tauri::AppHandle) {
         thread::sleep(Duration::from_millis(10));
 
         let width = start_time.elapsed().as_secs() as f64 * 2560.0 / 10.0;
-        change_overlay_color_size(color, width as u64, 15);
+        change_overlay_color_size(color, width as i32, 15);
 
         app.emit("wait_mouse_stop", start_time.elapsed().as_secs())
             .unwrap();
@@ -142,7 +147,7 @@ fn rest_counting(app: &tauri::AppHandle) {
         thread::sleep(Duration::from_millis(1000));
 
         let width = start_time.elapsed().as_secs() as f64 * 2560.0 / REST_DURATION.as_secs() as f64;
-        change_overlay_color_size(color, width as u64, 15);
+        change_overlay_color_size(color, width as i32, 15);
 
         app.emit("rest_count", start_time.elapsed().as_secs())
             .unwrap();
@@ -154,27 +159,27 @@ fn rest_counting(app: &tauri::AppHandle) {
 
 use std::ptr::null_mut;
 use std::sync::Mutex;
-use winapi::shared::minwindef::{TRUE, HINSTANCE, LPARAM, LRESULT, UINT, WPARAM};
-use winapi::shared::ntdef::{LONG, NULL};
-use winapi::shared::windef::{HGDIOBJ, HWND, HBITMAP,HDC};
+use winapi::shared::minwindef::{LPARAM, LRESULT, UINT, WPARAM};
+use winapi::shared::windef::{HGDIOBJ, HWND, RECT};
 use winapi::um::errhandlingapi::GetLastError;
 use winapi::um::libloaderapi::GetModuleHandleW;
 use winapi::um::wingdi::{
-    CreateCompatibleBitmap, CreateCompatibleDC, CreateSolidBrush, DeleteObject, Rectangle,
-    SelectObject, RGB, BitBlt, SRCCOPY, DeleteDC
+    BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, CreateSolidBrush, DeleteDC, DeleteObject
+    , SelectObject, RGB, SRCCOPY,
 };
-use winapi::um::winuser::{BeginPaint, CreateWindowExW, DefWindowProcW, DispatchMessageW, EndPaint, FillRect, FindWindowW, GetDC, GetMessageW, GetSystemMetrics, PostMessageW, PostQuitMessage, RegisterClassW, ReleaseDC, SetLayeredWindowAttributes, SetTimer, ShowWindow, TranslateMessage, UpdateWindow, CS_HREDRAW, CS_VREDRAW, LWA_COLORKEY, MSG, PAINTSTRUCT, SM_CXSCREEN, SM_CYSCREEN, SW_SHOW, WM_CLOSE, WM_CREATE, WM_DESTROY, WM_PAINT, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW, WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP, WM_TIMER, InvalidateRect, WNDCLASSEXW, LoadCursorW, IDC_ARROW, RegisterClassExW};
-use lazy_static::lazy_static;
-
+use winapi::um::winuser::{
+    BeginPaint, CreateWindowExW, DefWindowProcW, DispatchMessageW, EndPaint, FillRect, FindWindowW
+    , GetMessageW, GetSystemMetrics, InvalidateRect, KillTimer, PostMessageW,
+    PostQuitMessage, RegisterClassW, SetLayeredWindowAttributes,
+    SetTimer, ShowWindow, TranslateMessage, UpdateWindow, CS_HREDRAW, CS_VREDRAW,
+    LWA_COLORKEY, MSG, PAINTSTRUCT, SM_CXSCREEN, SM_CYSCREEN, SW_SHOW, WM_CLOSE, WM_CREATE,
+    WM_DESTROY, WM_PAINT, WM_TIMER, WNDCLASSW, WS_EX_LAYERED, WS_EX_TOOLWINDOW,
+    WS_EX_TOPMOST, WS_EX_TRANSPARENT, WS_POPUP,
+};
 
 static COLOR: Mutex<u32> = Mutex::new(0x00FF00);
-static RECT_SIZE: Mutex<(u64, u64)> = Mutex::new((100, 200));
-const WINDOW_WIDTH: i32 = 800;
-const WINDOW_HEIGHT: i32 = 600;
-lazy_static! {
-    static ref RECT_POS: Mutex<(i32, i32, i32, i32)> =
-        Mutex::new((50, 50, 2, 2)); // (x, y, dx, dy)
-}
+static RECT_SIZE: Mutex<(i32, i32)> = Mutex::new((100, 200));
+
 unsafe extern "system" fn wnd_proc(
     hwnd: HWND,
     msg: UINT,
@@ -182,66 +187,56 @@ unsafe extern "system" fn wnd_proc(
     lparam: LPARAM,
 ) -> LRESULT {
     let color = *COLOR.lock().unwrap();
-    static mut HDC_MEM: HDC = null_mut();
-    static mut HBM_MEM: HBITMAP = null_mut();
-    static mut H_OLD: HGDIOBJ = null_mut();
+    let (width, height) = *RECT_SIZE.lock().unwrap();
     match msg {
-        WM_CREATE => {
-            // 创建内存 DC
-            let hdc = GetDC(hwnd);
-            HDC_MEM = CreateCompatibleDC(hdc);
-            HBM_MEM = CreateCompatibleBitmap(hdc, WINDOW_WIDTH, WINDOW_HEIGHT);
-            H_OLD = SelectObject(HDC_MEM, HBM_MEM as _);
-            ReleaseDC(hwnd, hdc);
+        WM_CREATE => unsafe {
+            SetTimer(hwnd, 1, 16, None);
             0
-        }
-        WM_TIMER => {
-            // 更新矩形位置
-            let mut rect_pos = RECT_POS.lock().unwrap();
-            let (x, y, dx, dy) = *rect_pos;
-            let new_x = x + dx;
-            let new_y = y + dy;
-            let new_dx = if new_x <= 0 || new_x >= WINDOW_WIDTH - 100 { -dx } else { dx };
-            let new_dy = if new_y <= 0 || new_y >= WINDOW_HEIGHT - 100 { -dy } else { dy };
-            *rect_pos = (new_x, new_y, new_dx, new_dy);
+        },
+        WM_TIMER => unsafe {
             InvalidateRect(hwnd, null_mut(), 1);
             0
-        }
-        WM_PAINT => {
+        },
+        WM_PAINT => unsafe {
             let mut ps: PAINTSTRUCT = std::mem::zeroed();
             let hdc = BeginPaint(hwnd, &mut ps);
 
-            // 填充背景为透明色（黑色）
-            let h_brush = CreateSolidBrush(color);
-            FillRect(HDC_MEM, &ps.rcPaint, h_brush);
-            DeleteObject(h_brush as _);
+            // 创建兼容DC和位图
+            let mem_dc = CreateCompatibleDC(hdc);
+            let mem_bitmap = CreateCompatibleBitmap(
+                hdc,
+                GetSystemMetrics(SM_CXSCREEN),
+                GetSystemMetrics(SM_CYSCREEN),
+            );
+            SelectObject(mem_dc, mem_bitmap as HGDIOBJ);
+            // 填充透明背景
+            let h_brush = CreateSolidBrush(RGB(0, 0, 0));
+            FillRect(mem_dc, &ps.rcPaint, h_brush);
+            DeleteObject(h_brush as HGDIOBJ);
+            // 绘制红色矩形
+            let real_brush = CreateSolidBrush(color);
+            let rect = RECT { left: 0, top: 0, right: width, bottom: height };
+            FillRect(mem_dc, &rect, real_brush);
 
-            // 绘制矩形
-            let rect_pos = RECT_POS.lock().unwrap();
-            let h_brush = CreateSolidBrush(RGB(255, 0, 0)); // 红色
-            SelectObject(HDC_MEM, h_brush as _);
-            Rectangle(HDC_MEM, rect_pos.0, rect_pos.1, rect_pos.0 + 100, rect_pos.1 + 100);
-            DeleteObject(h_brush as _);
-
-            // 复制到窗口
-            BitBlt(hdc, 0, 0, WINDOW_WIDTH, WINDOW_HEIGHT, HDC_MEM, 0, 0, SRCCOPY);
-
+            DeleteObject(real_brush as HGDIOBJ);
+            // 将内存DC内容复制到屏幕DC
+            BitBlt(hdc,0,0,GetSystemMetrics(SM_CXSCREEN),GetSystemMetrics(SM_CYSCREEN),mem_dc,0,0,SRCCOPY,);
+            // 清理
+            DeleteObject(mem_bitmap as HGDIOBJ);
+            DeleteDC(mem_dc);
             EndPaint(hwnd, &ps);
             0
-        }
-        WM_DESTROY => {
-            // 清理资源
-            SelectObject(HDC_MEM, H_OLD);
-            DeleteObject(HBM_MEM as _);
-            DeleteDC(HDC_MEM);
+        },
+        WM_DESTROY => unsafe {
+            KillTimer(hwnd, 1);
             PostQuitMessage(0);
             0
-        }
-        _ => DefWindowProcW(hwnd, msg, wparam, lparam),
+        },
+        _ => unsafe { DefWindowProcW(hwnd, msg, wparam, lparam) },
     }
 }
 
-fn create_overlay(color: u32, width: u64, height: u64) {
+fn create_overlay(color: u32, width: i32, height: i32) {
     unsafe {
         let class_name = to_wstring("OverlayWindowClass");
         let window_name = to_wstring("Click-Through Overlay");
@@ -249,47 +244,33 @@ fn create_overlay(color: u32, width: u64, height: u64) {
         *COLOR.lock().unwrap() = color;
         *RECT_SIZE.lock().unwrap() = (width, height);
         // Register the window class
-        let wc = WNDCLASSEXW {
-            cbSize: size_of::<WNDCLASSEXW>() as _,
+        let wc = WNDCLASSW {
             style: CS_HREDRAW | CS_VREDRAW,
             lpfnWndProc: Some(wnd_proc),
+            hInstance: GetModuleHandleW(null_mut()),
+            lpszClassName: class_name.as_ptr(),
             cbClsExtra: 0,
             cbWndExtra: 0,
-            hInstance: h_instance,
-            hIcon: ptr::null_mut(),
-            hCursor: LoadCursorW(ptr::null_mut(), IDC_ARROW),
-            hbrBackground: ptr::null_mut(),
-            lpszMenuName: ptr::null(),
-            lpszClassName: class_name.as_ptr(),
-            hIconSm: ptr::null_mut(),
+            hIcon: null_mut(),
+            hCursor: null_mut(),
+            hbrBackground: null_mut(),
+            lpszMenuName: null_mut(),
         };
 
-        RegisterClassExW(&wc);
-
-        // let hwnd = CreateWindowExW(
-        //     WS_EX_LAYERED | WS_EX_TOPMOST | WS_EX_TRANSPARENT | WS_EX_TOOLWINDOW,
-        //     class_name.as_ptr(),
-        //     window_name.as_ptr(),
-        //     WS_POPUP,
-        //     0,
-        //     0,
-        //     GetSystemMetrics(SM_CXSCREEN),
-        //     GetSystemMetrics(SM_CYSCREEN),
-        //     null_mut(),
-        //     null_mut(),
-        //     null_mut(),
-        //     null_mut(),
-        // );
+        RegisterClassW(&wc);
+        // 获取屏幕尺寸
+        let screen_width = GetSystemMetrics(SM_CXSCREEN);
+        let screen_height = GetSystemMetrics(SM_CYSCREEN);
         // 创建窗口
         let hwnd = CreateWindowExW(
-            WS_EX_LAYERED,
+            WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_TOPMOST | WS_EX_TOOLWINDOW,
             class_name.as_ptr(),
             window_name.as_ptr(),
             WS_POPUP,
             0,
             0,
-            WINDOW_WIDTH,
-            WINDOW_HEIGHT,
+            screen_width,
+            screen_height,
             ptr::null_mut(),
             ptr::null_mut(),
             h_instance,
@@ -302,18 +283,14 @@ fn create_overlay(color: u32, width: u64, height: u64) {
         ShowWindow(hwnd, SW_SHOW);
         UpdateWindow(hwnd);
 
-        // 设置定时器（每50ms）
-        SetTimer(hwnd, 1, 50, *ptr::null_mut());
-
         // 消息循环
-        let mut msg: winapi::um::winuser::MSG = mem::zeroed();
+        let mut msg: MSG = mem::zeroed();
         while GetMessageW(&mut msg, ptr::null_mut(), 0, 0) > 0 {
             TranslateMessage(&msg);
             DispatchMessageW(&msg);
         }
     }
 }
-
 fn to_wstring(s: &str) -> Vec<u16> {
     s.encode_utf16().chain(std::iter::once(0)).collect()
 }
@@ -337,16 +314,7 @@ fn close_overlay() {
     }
 }
 
-fn change_overlay_color_size(color: u32, width: u64, height: u64) {
+fn change_overlay_color_size(color: u32, width: i32, height: i32) {
     *COLOR.lock().unwrap() = color;
     *RECT_SIZE.lock().unwrap() = (width, height);
-    // let wide_title = to_wstring("Click-Through Overlay");
-    // let hwnd = unsafe { FindWindowW(null_mut(), wide_title.as_ptr()) };
-    // if hwnd.is_null() {
-    //     println!("No window found to close.");
-    // } else {
-    //     unsafe {
-    //         InvalidateRect(hwnd, null_mut(), TRUE);
-    //     }
-    // }
 }

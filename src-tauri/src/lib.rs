@@ -6,6 +6,7 @@ use tauri_plugin_sql::{Migration, MigrationKind};
 
 mod commands;
 mod wallpaper;
+mod rest;
 
 pub fn run() {
     let migrations = vec![Migration {
@@ -36,13 +37,15 @@ pub fn run() {
         .setup(|app| {
             autostart(app);
             tray_setup(app)?;
+            rest::start_timer(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
             commands::open_folder,
             commands::open_file_in_folder,
             commands::set_wallpaper_command,
-            commands::fetch_wallpaper
+            commands::fetch_wallpaper,
+            rest::start_timer,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

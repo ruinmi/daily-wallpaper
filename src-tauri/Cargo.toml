@@ -28,6 +28,9 @@ reqwest = "0.12.9"
 tauri-plugin-fs = "2"
 tauri-plugin-sql = { version = "2", features = ["sqlite"] }
 wallpaper = "3.2.0"
+device_query = "3.0.1"
+rodio = { version = "0.20.1", default-features = false, features = ["symphonia-mp3"] }
+winapi = { version = "0.3.9", features = ["windef", "wingdi", "libloaderapi", "errhandlingapi", "ntdef", "d2d1"] }
 
 [target.'cfg(not(any(target_os = "android", target_os = "ios")))'.dependencies]
 tauri-plugin-autostart = "2"
