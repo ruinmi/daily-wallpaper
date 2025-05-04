@@ -10,10 +10,12 @@ use tauri::Emitter;
 use tauri::Manager;
 
 const WORK_DURATION: Duration = Duration::new(30 * 60, 0);
-// const WORK_DURATION: Duration = Duration::new(3, 0);
+// const WORK_DURATION: Duration = Duration::new(10, 0);
 const REST_DURATION: Duration = Duration::new(5 * 60, 0);
-// const REST_DURATION: Duration = Duration::new(10, 0);
+// const REST_DURATION: Duration = Duration::new(5, 0);
 static MP3_PATH: Mutex<String> = Mutex::new(String::new());
+const MONITOR_WIDTH: f64 = 2560.0;
+const PROGRESS_BAR_HEIGHT: i32 = 15;
 
 #[tauri::command]
 pub fn start_timer(app: tauri::AppHandle) {
@@ -35,36 +37,54 @@ pub fn start_timer(app: tauri::AppHandle) {
             if mouse_position != last_position {
                 // 如果鼠标移动且计时器未开始，则开始计时
                 println!("Mouse moved! Starting timer...");
-                work_counting(&app);
+                if work_counting(&app) {
+                    println!("30 minutes passed! Playing music...");
+                    play_mp3();
 
-                // 计时结束后播放音乐
-                println!("30 minutes passed! Playing music...");
-                play_mp3();
+                    println!("Waiting for mouse to stop");
+                    wait_for_mouse_stop(&app);
 
-                println!("Waiting for mouse to stop");
-                wait_for_mouse_stop(&app);
-
-                println!("Rest Counting");
-                rest_counting(&app);
+                    println!("Rest Counting");
+                    rest_counting(&app);
+                }
 
                 last_position = device_state.get_mouse().coords;
             }
 
-            thread::sleep(Duration::from_millis(100)); // 每 100 毫秒检查一次
+            thread::sleep(Duration::from_millis(1000));
         }
     });
 }
 
-fn work_counting(app: &tauri::AppHandle) {
+fn work_counting(app: &tauri::AppHandle) -> bool {
+    close_overlay();
+
+    let device_state = DeviceState::new();
+    let mut last_position = device_state.get_mouse().coords;
+    let mut change_time = 0;
+    
     let start_time = Instant::now();
-    // 等待 30 分钟
     while start_time.elapsed() < WORK_DURATION {
+        let mouse_position = device_state.get_mouse().coords;
+        if last_position != mouse_position {
+            last_position = mouse_position;
+            change_time = start_time.elapsed().as_secs();
+        }
+        
         thread::sleep(Duration::from_millis(1000));
+
+        if start_time.elapsed().as_secs() - change_time >= 300 {
+            println!("Looks like there is no one here, waiting...");
+            app.emit("rest_done", "true").unwrap();
+            return false;
+        }
+        
         app.emit("work_count", start_time.elapsed().as_secs())
             .unwrap();
     }
 
     app.emit("work_done", "true").unwrap();
+    true
 }
 
 fn play_mp3() {
@@ -111,7 +131,7 @@ fn play_mp3() {
 fn wait_for_mouse_stop(app: &tauri::AppHandle) {
     let color = 0x82AAFF;
     thread::spawn(move || {
-        create_overlay(color, 0, 15);
+        create_overlay(color, 0, PROGRESS_BAR_HEIGHT);
     });
     let mut start_time = Instant::now();
     let device_state = DeviceState::new();
@@ -121,40 +141,36 @@ fn wait_for_mouse_stop(app: &tauri::AppHandle) {
         if mouse_position != last_position {
             last_position = mouse_position;
             start_time = Instant::now();
-            change_overlay_color_size(color, 0, 15);
+            change_overlay_color_size(Some(color), 0, PROGRESS_BAR_HEIGHT);
             app.emit("move_continue", "true").unwrap();
         }
 
         thread::sleep(Duration::from_millis(10));
 
-        let width = start_time.elapsed().as_secs() as f64 * 2560.0 / 10.0;
-        change_overlay_color_size(color, width as i32, 15);
+        let width = start_time.elapsed().as_secs() as f64 * MONITOR_WIDTH / 10.0;
+        change_overlay_color_size(Some(color), width as i32, PROGRESS_BAR_HEIGHT);
 
         app.emit("wait_mouse_stop", start_time.elapsed().as_secs())
             .unwrap();
     }
-    close_overlay();
 }
 
 fn rest_counting(app: &tauri::AppHandle) {
     let color = 0xC5E478;
-    thread::spawn(move || {
-        create_overlay(color, 0, 15);
-    });
+    change_overlay_color_size(None, MONITOR_WIDTH as i32, PROGRESS_BAR_HEIGHT);
 
     let start_time = Instant::now();
     while start_time.elapsed() < REST_DURATION {
         thread::sleep(Duration::from_millis(1000));
 
-        let width = start_time.elapsed().as_secs() as f64 * 2560.0 / REST_DURATION.as_secs() as f64;
-        change_overlay_color_size(color, width as i32, 15);
+        let width = start_time.elapsed().as_secs() as f64 * MONITOR_WIDTH / REST_DURATION.as_secs() as f64;
+        change_overlay_color_size(Some(color), width as i32, PROGRESS_BAR_HEIGHT);
 
         app.emit("rest_count", start_time.elapsed().as_secs())
             .unwrap();
     }
 
     app.emit("rest_done", "true").unwrap();
-    close_overlay();
 }
 
 use std::ptr::null_mut;
@@ -213,7 +229,7 @@ unsafe extern "system" fn wnd_proc(
             let h_brush = CreateSolidBrush(RGB(0, 0, 0));
             FillRect(mem_dc, &ps.rcPaint, h_brush);
             DeleteObject(h_brush as HGDIOBJ);
-            // 绘制红色矩形
+            // 绘制矩形
             let real_brush = CreateSolidBrush(color);
             let rect = RECT { left: 0, top: 0, right: width, bottom: height };
             FillRect(mem_dc, &rect, real_brush);
@@ -314,7 +330,9 @@ fn close_overlay() {
     }
 }
 
-fn change_overlay_color_size(color: u32, width: i32, height: i32) {
-    *COLOR.lock().unwrap() = color;
+fn change_overlay_color_size(color: Option<u32>, width: i32, height: i32) {
+    if let Some(new_color) = color {
+        *COLOR.lock().unwrap() = new_color
+    }
     *RECT_SIZE.lock().unwrap() = (width, height);
 }
