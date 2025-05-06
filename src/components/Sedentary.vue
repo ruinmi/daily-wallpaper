@@ -4,21 +4,21 @@ import {listen} from '@tauri-apps/api/event';
 
 const work_duration = 1800;
 // const work_duration = 10;
-const rest_duration = 300;
-// const rest_duration = 5;
+const break_duration = 300;
+// const break_duration = 5;
 
 
-const rest_done = ref(false);
+const break_done = ref(false);
 const work_done = ref(false);
 const move_continue = ref(false);
-const rest_count = ref(0);
+const break_count = ref(0);
 const work_count = ref(0);
 const mouse_stop_count = ref(0);
 
 // 监听鼠标位置变化事件
 const listenAll = () => {
-  listen('rest_done', () => {
-    rest_done.value = true;
+  listen('break_done', () => {
+    break_done.value = true;
     work_done.value = true;
     move_continue.value = false;
   });
@@ -28,22 +28,22 @@ const listenAll = () => {
   listen('move_continue', () => {
     move_continue.value = true;
     work_done.value = true;
-    rest_done.value = false;
+    break_done.value = false;
   });
   listen<number>('wait_mouse_stop', (data) => {
     mouse_stop_count.value = Number(data.payload);
     work_done.value = true;
-    rest_done.value = false;
+    break_done.value = false;
   });
-  listen<number>('rest_count', (data) => {
-    rest_count.value = Number(data.payload);
+  listen<number>('break_count', (data) => {
+    break_count.value = Number(data.payload);
     work_done.value = true;
-    rest_done.value = false;
+    break_done.value = false;
     move_continue.value = false;
   });
   listen<number>('work_count', (data) => {
     work_count.value = Number(data.payload);
-    rest_done.value = false;
+    break_done.value = false;
     work_done.value = false;
     move_continue.value = false;
   });
@@ -91,10 +91,10 @@ onBeforeUnmount(() => {
       <n-progress :height="23" class="progress" type="line" :percentage="mouse_stop_count * 10"
                   indicator-placement="inside" processing/>
     </p>
-    <p v-else-if="work_done && !rest_done">
+    <p v-else-if="work_done && !break_done">
       休息ing
       <n-progress :height="23" class="progress" type="line"
-                  :percentage="Number((rest_count / rest_duration * 100).toFixed(2))"
+                  :percentage="Number((break_count / break_duration * 100).toFixed(2))"
                   indicator-placement="inside" processing/>
     </p>
     <p v-else>等待回来</p>

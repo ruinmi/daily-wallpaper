@@ -1,15 +1,20 @@
 export interface WallpaperCriteria {
-    page: number,
-    perPage: number,
-    keyword: string,
-    orientation: string,
-    color: string,
-    updateHours: number,
-    updateMinutes: number,
+  page: number,
+  perPage: number,
+  keyword: string,
+  orientation: string,
+  color: string,
+  updateHours: number,
+  updateMinutes: number,
 }
 
 export interface Config {
-    activeWpIdx: number,
-    activeWpName: string,
-    wpChangeDate: string
+  activeWpIdx: number,
+  activeWpName: string,
+  wpChangeDate: string,
+  
+  workDuration: number, 
+  breakDuration: number,
+  idleTimeout: number,
+  progressBarHeight: number,
 }

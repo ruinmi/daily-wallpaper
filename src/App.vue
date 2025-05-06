@@ -3,7 +3,7 @@ import {darkTheme} from 'naive-ui'
 import Dashboard from "./components/Dashboard.vue";
 import Showcase from "./components/Showcase.vue";
 import WallpaperCriteria from "./components/WallpaperCriteria.vue";
-import Rest from "./components/Rest.vue";
+import Sedentary from "./components/Sedentary.vue";
 import {useMainStore} from "./stores/useMainStore.ts";
 import TitleBar from "./components/TitleBar.vue";
 import { themeOverrides } from './modules/theme-overrides';
@@ -48,7 +48,7 @@ onMounted(async () => {
           </n-tab-pane>
           
           <n-tab-pane name="standup" tab="休息">
-            <Rest/>
+            <Sedentary/>
           </n-tab-pane>
         </n-tabs>
 

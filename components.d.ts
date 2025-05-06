@@ -31,7 +31,7 @@ declare module 'vue' {
     NTabPane: typeof import('naive-ui')['NTabPane']
     NTabs: typeof import('naive-ui')['NTabs']
     NTimePicker: typeof import('naive-ui')['NTimePicker']
-    Rest: typeof import('./src/components/Rest.vue')['default']
+    Sedentary: typeof import('./src/components/Sedentary.vue')['default']
     Showcase: typeof import('./src/components/Showcase.vue')['default']
     TitleBar: typeof import('./src/components/TitleBar.vue')['default']
     WallpaperCriteria: typeof import('./src/components/WallpaperCriteria.vue')['default']
