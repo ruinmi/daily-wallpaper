@@ -21,7 +21,12 @@ export const useMainStore = defineStore('main-store', () => {
   const defaultConfig: Config = {
     activeWpIdx: -1,
     activeWpName: '',
-    wpChangeDate: ''
+    wpChangeDate: '',
+
+    workDuration: 1800,
+    breakDuration: 300,
+    idleTimeout: 600,
+    progressBarHeight: 15,
   }
 
   let store: Store;
@@ -50,6 +55,13 @@ export const useMainStore = defineStore('main-store', () => {
 
   const read = async () => {
     config.value = Object.fromEntries(await store.entries()) as unknown as Config
+    const entries = await store.entries()
+    const loaded = Object.fromEntries(entries) as Partial<Config>
+
+    config.value = {
+      ...defaultConfig,
+      ...loaded
+    }
   }
 
   watchDebounced(config, async (v) => {

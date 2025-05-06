@@ -1,7 +1,7 @@
 use device_query::{DeviceQuery, DeviceState};
 use rodio::{Decoder, OutputStream, Sink};
 use std::{fs, fs::File, io::BufReader, mem, ptr, thread, time::{Duration, Instant}};
-use tauri::{scope, Emitter};
+use tauri::Emitter;
 use tauri::Manager;
 use std::ptr::null_mut;
 use std::sync::Mutex;
@@ -32,20 +32,19 @@ pub fn start_timer(app: tauri::AppHandle) {
         .join("wakeup.mp3")
         .to_string_lossy()
         .into_owned();
-    let sc = SedentaryConfig {
-        work_duration: 30 * 60,
-        break_duration: 5 * 60,
-        idle_timeout: 10 * 60,
-        progress_bar_height: 15,
-    };
-    let sed = Sedentary::new(sc, mp3_path, 2560.0);
     let app_clone = app.clone();
 
     thread::spawn(move || {
+        let mut sed = Sedentary::new(Duration::from_secs(30 * 60), Duration::from_secs(5 * 60), 10 * 60, 15, mp3_path, 2560.0);
         let device_state = DeviceState::new();
         let mut last_position = device_state.get_mouse().coords;
 
         loop {
+            if let Err(e) = sed.update_config(&app_clone) {
+                eprintln!("Failed to update config: {}，1秒后重试…", e);
+                thread::sleep(Duration::from_secs(1));
+                continue;
+            }
             let mouse_position = device_state.get_mouse().coords;
 
             if mouse_position != last_position {
@@ -67,14 +66,12 @@ pub fn start_timer(app: tauri::AppHandle) {
 
             thread::sleep(Duration::from_millis(1000));
         }
-    })
+    });
 }
 
 struct Sedentary {
     work_duration: Duration,
-    // work_duration: Duration = Duration::new(10, 0);
     break_duration: Duration,
-    // break_duration: Duration = Duration::new(5, 0);
     mp3_path: String,
     monitor_width: f64,
     progress_bar_height: i32,
@@ -82,32 +79,44 @@ struct Sedentary {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
 struct SedentaryConfig {
-    work_duration: u64,
-    break_duration: u64,
-    idle_timeout: u64,
-    progress_bar_height: i32,
+    work_duration: Option<u64>,
+    break_duration: Option<u64>,
+    idle_timeout: Option<u64>,
+    progress_bar_height: Option<i32>,
 }
 
 impl Sedentary {
-    fn new(cfg: SedentaryConfig, mp3_path: String, monitor_width: f64) -> Self {
+    fn new(work_duration: Duration, break_duration: Duration, idle_timeout: u64, progress_bar_height: i32, mp3_path: String, monitor_width: f64) -> Self {
         Sedentary {
-            work_duration: Duration::from_secs(cfg.work_duration),
-            break_duration: Duration::from_secs(cfg.break_duration),
-            idle_timeout: cfg.idle_timeout,
-            progress_bar_height: cfg.progress_bar_height,
+            work_duration,
+            break_duration,
+            idle_timeout,
+            progress_bar_height,
             mp3_path,
             monitor_width,
         }
     }
     
-    fn update_config(&mut self) -> Result<(), Box<dyn std::error::Error>> {
-        let content = fs::read_to_string("config.json")?;
+    fn update_config(&mut self, app: &tauri::AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+        let app_data_dir = app.path().app_data_dir().unwrap();
+        let config_path = app_data_dir.join(".main.dat");
+        let content = fs::read_to_string(config_path)?;
         let cfg: SedentaryConfig = serde_json::from_str(&content)?;
-        self.work_duration = Duration::from_secs(cfg.work_duration);
-        self.break_duration = Duration::from_secs(cfg.break_duration);
-        self.idle_timeout = cfg.idle_timeout;
-        self.progress_bar_height = cfg.progress_bar_height;
+        
+        if let Some(sec) = cfg.work_duration {
+            self.work_duration = Duration::from_secs(sec);
+        }
+        if let Some(sec) = cfg.break_duration {
+            self.break_duration = Duration::from_secs(sec);
+        }
+        if let Some(to) = cfg.idle_timeout {
+            self.idle_timeout = to;
+        }
+        if let Some(h) = cfg.progress_bar_height {
+            self.progress_bar_height = h;
+        }
         Ok(())
     }
 
@@ -117,7 +126,7 @@ impl Sedentary {
         let device_state = DeviceState::new();
         let mut last_position = device_state.get_mouse().coords;
         let mut change_time = 0;
-
+        
         let start_time = Instant::now();
         while start_time.elapsed() < self.work_duration {
             let mouse_position = device_state.get_mouse().coords;

@@ -1,12 +1,7 @@
 <script setup lang="ts">
 import {ref, onMounted, onBeforeUnmount} from 'vue';
 import {listen} from '@tauri-apps/api/event';
-
-const work_duration = 1800;
-// const work_duration = 10;
-const break_duration = 300;
-// const break_duration = 5;
-
+import {useMainStore} from "../stores/useMainStore.ts";
 
 const break_done = ref(false);
 const work_done = ref(false);
@@ -58,32 +53,50 @@ onMounted(() => {
 onBeforeUnmount(() => {
 });
 
-// function formatTime(seconds: number): string {
-//     // 如果小于一分钟，直接返回秒数
-//     if (seconds < 60) {
-//         return `${seconds}秒`;
-//     }
-
-//     // 计算小时、分钟和秒数
-//     const hours = Math.floor(seconds / 3600); // 小时数
-//     const minutes = Math.floor((seconds % 3600) / 60); // 分钟数
-//     const remainingSeconds = seconds % 60; // 剩余秒数
-
-//     // 如果小时数大于 0，返回 h:m:s 格式
-//     if (hours > 0) {
-//         return `${hours}小时${minutes}分钟${remainingSeconds}秒`;
-//     }
-
-//     // 如果小时数为 0，只返回 m:s 格式
-//     return `${minutes}分钟${remainingSeconds}秒`;
-// }
+const mainStore = useMainStore()
 </script>
 <template>
   <div>
+    <n-form
+        :model="mainStore.config"
+        label-placement="left"
+        label-width="auto"
+        require-mark-placement="right-hanging"
+    >
+      <n-form-item path="workDuration" label="久坐时长">
+        <n-input-number v-model:value="mainStore.config.workDuration" :show-button="false">
+          <template #suffix>
+            s
+          </template>
+        </n-input-number>
+      </n-form-item>
+      <n-form-item path="breakDuration" label="休息时长">
+        <n-input-number v-model:value="mainStore.config.breakDuration" :show-button="false">
+          <template #suffix>
+            s
+          </template>
+        </n-input-number>
+      </n-form-item>
+      <n-form-item path="idleTimeout" label="IDLE超时">
+        <n-input-number v-model:value="mainStore.config.idleTimeout" :show-button="false">
+          <template #suffix>
+            s
+          </template>
+        </n-input-number>
+      </n-form-item>
+      <n-form-item path="progressBarHeight" label="进度条宽度">
+        <n-input-number v-model:value="mainStore.config.progressBarHeight" :show-button="false">
+          <template #suffix>
+            s
+          </template>
+        </n-input-number>
+      </n-form-item>
+    </n-form>
+    
     <p v-if="!work_done">
       坐着ing
       <n-progress :height="23" class="progress" type="line"
-                  :percentage="Number((work_count / work_duration * 100).toFixed(2))"
+                  :percentage="Number((work_count / mainStore.config.workDuration * 100).toFixed(2))"
                   indicator-placement="inside" processing/>
     </p>
     <p v-else-if="move_continue">
@@ -94,7 +107,7 @@ onBeforeUnmount(() => {
     <p v-else-if="work_done && !break_done">
       休息ing
       <n-progress :height="23" class="progress" type="line"
-                  :percentage="Number((break_count / break_duration * 100).toFixed(2))"
+                  :percentage="Number((break_count / mainStore.config.breakDuration * 100).toFixed(2))"
                   indicator-placement="inside" processing/>
     </p>
     <p v-else>等待回来</p>
