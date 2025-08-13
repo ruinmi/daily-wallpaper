@@ -94,8 +94,12 @@ export const fetchWallpaper = async () => {
 export const batchRemoveFiles = async (filePaths: string[]) => {
     await Promise.all(filePaths.map(async (path) => {
         if (await exists(path)) {
-            console.log(path)
+          try {
+            console.log(`removing ${path}`)
             await remove(path)
+          } catch (e) {
+              console.error(e)
+          }
         }
     }))
 }

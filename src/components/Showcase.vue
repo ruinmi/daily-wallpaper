@@ -46,6 +46,8 @@ const imageCache = new Map(); // 缓存图片的 Map
 
 const loadImageWithCache = async () => {
   const imagePath = currentWallpaper.value ? currentWallpaper.value.img_src : "";
+  if (!imagePath) return
+  
   if (imageCache.has(imagePath)) {
     currentSrc.value = imageCache.get(imagePath).src
     return

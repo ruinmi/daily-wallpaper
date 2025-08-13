@@ -87,7 +87,7 @@ const mainStore = useMainStore()
       <n-form-item path="progressBarHeight" label="进度条宽度">
         <n-input-number v-model:value="mainStore.config.progressBarHeight" :show-button="false">
           <template #suffix>
-            s
+            px
           </template>
         </n-input-number>
       </n-form-item>
